@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-cmn-Hans">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title></title>
+    <link rel="stylesheet" href="">
+    <style>
+        body{
+            /*background: black;*/
+        }
+        #c1{
+            background: rgba(255,255,255,0);
+            position: fixed;
+        }
+        #txt1, #txt2, #txt3{
+            width: 400px;
+            color: rgb(255, 133, 133);
+            margin-left: 50px;
+            margin-top: 20px;
+        }
+        /*#txt1{
+            position: absolute;
+            left: 50px; 
+            top: 0;
+        }*/
+        #music {
+            position: fixed;
+            right: 50px;
+            top: 50px;
+            width: 32px;
+            height: 32px;
+            background: url(icon-music.png) no-repeat;
+            background-size: 100%;
+            cursor: pointer;
+        }
+        .rotate{
+            -webkit-animation: rotating 1.2s linear infinite;
+            -moz-animation: rotating 1.2s linear infinite;
+            -o-animation: rotating 1.2s linear infinite;
+            animation: rotating 1.2s linear infinite; 
+        }
+        @keyframes rotating{
+            0%{transform: rotate(0deg);}
+            100%{transform: rotate(360deg);}
+        }
+    </style>
+</head>
+<body>
+    <canvas id="c1" ></canvas>
+    <div id="music" class = "rotate">
+        <audio id = "audio" autoplay loop src="周杰伦 - 晴天.mp3">您的浏览器不支持背景音乐！！！</audio>
+    </div>
+    <div id="txt1"> </div>
+    <div id="txt2"> </div>
+    <div id="txt3"> </div>
+    <!-- canvas运动原理，每次都擦除画布然后重新绘制 -->
+    <!-- 多物体运动核心，存储多物体的数据 -->
+    <script>
+        // 先把画布充满屏幕
+        ;(function() {
+            var c1 = document.getElementById('c1');
+
+            c1.setAttribute("height",window.innerHeight);
+            c1.setAttribute("width",window.innerWidth);
+        }())
+        // 背景无规则心形图案
+        ;(function() {
+            function heart() {
+                var c1 = document.getElementById('c1'),
+                    ctx = c1.getContext("2d"),
+                    data = [],  // 存储每个物体的数据
+                    // offsetX = 200,
+                    // offsetY = 200,
+                    // r = 10,
+                    num = 360,  // 图形一共需要分割成曲线的个数
+                    step = (360/num)/3, // 每个相邻取样点相差的角度数
+                    timer1, timer2;
+
+                // 物体的运动，延时时间控制单个物体运动的速度
+                timer1 = setInterval(function() {
+                    var i;
+                    ctx.clearRect(0, 0, c1.width, c1.height);
+
+                    for (i = 0; i < data.length; i += 1) {
+                        data[i].r += 0.1;
+                        data[i].A -= 0.01;
+                        if (data[i].A < 0.02) {
+                            data.splice(i,1);
+                        }
+                    }
+                        
+                    // 循环存储的数据
+                    for (i = 0; i < data.length; i += 1) {
+                        // 绘制单个物体的运动
+                        drowHeart(data[i]);
+                    }
+                }, 50);
+
+                // 保存多物体的数据，延时时间控制物体数量增加的速度
+                timer2 = setInterval(function() {
+                    var x = Math.random() * c1.width,
+                        y = Math.random() * c1.height,
+                        r = Math.random() * 0.5 + 0.5,
+                        // R = Math.floor(Math.random() * 256),
+                        R = 255,
+                        G = Math.floor(Math.random() * 256),
+                        B = Math.floor(Math.random() * 256),
+                        A = Math.random() * 0.6 + 0.2 ;
+
+                    data.push({
+                        x : x,
+                        y : y,
+                        r : r,
+                        R : R,
+                        G : G,
+                        B : B,
+                        A : A
+                    });
+                }, 300);
+            
+                // offsetX：起点x坐标，offsetY：起点y坐标，n：图形大小
+                function drowHeart(data) {
+                    var t = [], // 存储等分的弧度数组
+                        p = [], // 存储控制点的坐标信息
+                        i, j;
+                    // 计算得到画每个心形所需要的控制点
+                    for (i = 0; i <= 360; i += step) {
+                        t[i] = i * Math.PI/180;
+                        p.push({
+                            x : getX(t[i], data.r, data.x),
+                            y : getY(t[i], data.r, data.y)
+                        });
+                    }
+
+                    p.push(p[0]);   // 终点和起点相同
+
+                    ctx.beginPath();
+                    ctx.moveTo(p[0].x, p[0].y);
+                    // 绘制心形路径
+                    for (i = 0, j = 0; i < num; i += 1){
+                        j = i * 3;
+                        ctx.bezierCurveTo(p[j + 1].x, p[j + 1].y, p[j + 2].x, p[j + 2].y, p[j + 3].x, p[j + 3].y);
+                    }
+
+                    ctx.closePath();
+                    ctx.fillStyle = "rgba(" + data.R + "," + data.G + "," + data.B + "," + data.A + ")";
+                    ctx.fill();
+                }
+
+                function getX(t, n, offsetX) {
+                    return 16 * Math.pow(Math.sin(t), 3) * n + offsetX;
+                }
+                function getY(t, n, offsetY) {
+                    var y;
+                    y = (13*Math.cos(t) - 5 * Math.cos(t * 2) - 2 * Math.cos(t * 3) - Math.cos(t * 4)) * n - offsetY;
+                    return -y;
+                }
+            }
+            heart();
+        }())
+        // 打字机效果打字
+        ;(function() {
+            function start() {
+                var text1 = "<h1>《晴天》</h1>" + 
+                            "<p>故事的小黄花 从出生那年就飘着</p>" + 
+                            "<p>童年的荡秋千 随记忆一直晃到现在</p>" +
+                            "<p>Re So So Si Do Si La</p>" +
+                            "<p>So La Si Si Si Si La Si La So</p>" +
+                            "<p>吹着前奏 望着天空</p>" +
+                            "<p>我想起花瓣 试着掉落</p>" +
+                            "<p>为你翘课的那一天</p>" +
+                            "<p>花落的那一天</p>" +
+                            "<p>教室的那一间 我怎么看不见</p>" +
+                            "<p>消失的下雨天 我好想再淋一遍</p>" +
+                            "<p>没想到 失去的勇气我还留着</p>" +
+                            "<p>好想再问一遍 你会等待还是离开</p>" +
+                            "<p>刮风这天 我试过握着你手</p>" +
+                            "<p>但偏偏 雨渐渐</p>" +
+                            "<p>大到我看你不见</p>" +
+                            "<p>还要多久 我才能在你身边</p>" +
+                            "<p>等到放晴的那天</p>" +
+                            "<p>也许我会比较好一点</p>" +
+                            "<p>从前从前 有个人爱你很久</p>" +
+                            "<p>但偏偏 风渐渐</p>" +
+                            "<p>把距离吹得好远</p>" +
+                            "<p>好不容易 又能再多爱一天</p>" +
+                            "<p>但故事的最后</p>" +
+                            "<p>你好像还是说了 拜拜</p>" +
+                            "<p>为你翘课的那一天</p>" +
+                            "<p>花落的那一天</p>" +
+                            "<p>教室的那一间 我怎么看不见</p>" +
+                            "<p>消失的下雨天 我好想再淋一遍</p>" +
+                            "<p>没想到 失去的勇气我还留着</p>" +
+                            "<p>好想再问一遍</p>" +
+                            "<p>你会等待还是离开</p>" +
+                            "<p>刮风这天 我试过握着你手</p>" +
+                            "<p>但偏偏 雨渐渐</p>" +
+                            "<p>大到我看你不见</p>" +
+                            "<p>还要多久 我才能在你身边</p>" +
+                            "<p>等到放晴的那天</p>" +
+                            "<p>也许我会比较好一点</p>" +
+                            "<p>从前从前 有个人爱你很久</p>" +
+                            "<p>偏偏 风渐渐</p>" +
+                            "<p>把距离吹得好远</p>" +
+                            "<p>好不容易 又能再多爱一天</p>" +
+                            "<p>但故事的最后</p>" +
+                            "<p>你好像还是说了 拜拜</p>" +
+                            "<p>刮风这天 我试过握着你手</p>" +
+                            "<p>但偏偏 雨渐渐</p>" +
+                            "<p>大到我看你不见</p>" +
+                            "<p>还要多久 我才能够在你身边</p>" +
+                            "<p>等到放晴那天</p>" +
+                            "<p>也许我会比较好一点</p>" +
+                            "<p>从前从前 有个人爱你很久</p>" +
+                            "<p>但偏偏 风渐渐</p>" +
+                            "<p>把距离吹得好远</p>" +
+                            "<p>好不容易 又能再多爱一天</p>" +
+                            "<p>但故事的最后</p>" +
+                            "<p>你好像还是说了 拜拜</p>",
+                    text2 = "<p><br></p>" +
+                            "<p><br></p>" + 
+                            "<p><br></p>" + 
+                            "<p><br></p>" + 
+                            "<p>铃，在村里过得还习惯吗？</p>" + 
+                            "<p>没有被别人欺负吧？</p>" +
+                            "<p>之前给你送去的和服，现在穿在身上了吗？</p>" +
+                            "<p>若你遭遇困境、心情低落或悲伤难过，</p>" +
+                            "<p>无论何时，</p>" +
+                            "<p>只需呼唤我杀生丸，</p>" +
+                            "<p>我会即刻赶到你身边。</p>" +
+                            "<p>即使相隔再遥远，</p>" +
+                            "<p>只要你叫我的名字，</p>" +
+                            "<p>我就马上飞奔过去。</p>" +
+                            "<p>无法呼喊的话，</p>" +
+                            "<p>吹声口哨也罢，</p>" +
+                            "<p>打声呼哨也好。</p>" +
+                            "<p>你我之间没有距离，</p>" +
+                            "<p>彼此的心紧密相连，</p>" +
+                            "<p>信赖的力量能战胜一切恐惧，</p>" +
+                            "<p>那样的感情也将使我们的心更加丰盈充实。</p>" +
+                            "<p>所以，</p>" +
+                            "<p>现在你只管做你自己就好，</p>" +
+                            "<p>以后时间还长，</p>" +
+                            "<p>足够我期待你发现自己的真心，</p>" +
+                            "<p>在此之前，</p>" +
+                            "<p>好好保重……</p>" ,
+                    text3 = "<p><br></p>" +
+                            "<p><br></p>" + 
+                            "<p><br></p>" + 
+                            "<p><br></p>" + 
+                            "<p>如果你感到难过</p>" + 
+                            "<p>我愿意帮你承受</p>" +
+                            "<p>如果我感觉喜悦</p>" +
+                            "<p>希望能与你分享</p>" +
+                            "<p>无论你多么讨厌我</p>" +
+                            "<p>但是请你相信</p>" +
+                            "<p>我会一直在你身后</p>" +
+                            "<p>THE END</p>" ;
+                function printWord(text, id, time){ 
+                    var txt = document.getElementById(id),
+                        i, j;
+
+                    i = printWord.i;
+                    j = printWord.j;
+
+                    str  = text.substr(0,i);
+
+                    if (j < 14) {
+                        if (j % 4 == 1 ) {
+                            txt.innerHTML = "<h1>_</h1>";
+                        } else {
+                            txt.innerHTML = "<h1></h1>";
+                        }
+                        j += 1;
+                    } else {
+                        if (text.substr(i-1,1) !== "<") {
+                            txt.innerHTML = str + "_";
+                        } else {
+                            txt.innerHTML = text.substr(0, i - 1) + "_";
+                            i += 1;
+                        }
+
+                        i += 1; 
+                    }
+
+                    if (i <= text.length) {
+                        setTimeout(function(){
+                            printWord(text, id, time);
+                        }, time);
+                    } else {
+                        txt.innerHTML = text;
+                    }
+
+                    printWord.i = i;
+                    printWord.j = j;
+                }
+
+                function scrollWindow(text, id) {
+                    var timer,
+                        txt = document.getElementById(id);
+                    timer = setInterval(function() {
+
+                        scrollBy(0, 1);
+
+                        if (txt.innerHTML === text) {
+                            clearInterval(timer);
+                        }
+
+                    }, 10);
+                }
+
+                setTimeout(function(){
+                    printWord.i = 1;
+                    printWord.j = 0;
+                    printWord(text1, "txt1", 200);
+
+                    // 5秒后开始滚动屏幕
+                    setTimeout(function() {
+                            scrollWindow(text1, "txt1");
+                        }, 5000);
+                }, 0);
+
+                setTimeout(function(){
+                    printWord.i = 1;
+                    printWord.j = 0;
+                    printWord(text2, "txt2", 400);
+
+                    // 直接开始滚动屏幕
+                    setTimeout(function() {
+                            scrollWindow(text2, "txt2");
+                        }, 0);
+                }, 600000);
+
+                setTimeout(function(){
+                    printWord.i = 1;
+                    printWord.j = 0;
+                    printWord(text3, "txt3", 400);
+
+                    // 不滚动屏幕
+                }, 900000);
+          
+            }
+            setTimeout(start, 23000);
+        }())
+        // 给音乐标签加上单击功能
+        ;(function() {
+            var music = document.getElementById('music'),
+                audio = document.getElementById('audio');
+
+            // 确保页面打开时音乐在播放
+            if (audio.paused) {
+                audio.play();
+                music.className = "rotate";
+            }
+
+            function bindMusic() {
+                music.onclick = function() {
+                    if (audio.paused) {
+                        audio.play();
+                        music.className = "rotate";
+                    } else {
+                        audio.pause();
+                        music.className = "";
+                    }
+                }
+            }
+            bindMusic();
+        }())
+    </script>
+</body>
+</html>
