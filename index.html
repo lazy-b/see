@@ -208,7 +208,7 @@
                 var c2 = document.getElementById('c2'),
                     ctx = c2.getContext("2d"),
                     data = [],  // 存储每个物体的数据
-                    num = 18,  // 图形一共需要分割成曲线的个数
+                    num = 18,  // 图形一共需要分割成曲线的个数，同时也是每个小心形分割的段数（此处影响不大）
                     step = (360/num)/3, // 每个相邻取样点相差的角度数
                     size = 1,      // 每个小心形图形最后的尺寸
                     timer1, timer2;
