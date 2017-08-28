@@ -21,14 +21,14 @@
             width: 400px;
             color: rgb(255, 133, 133);
             margin-left: 50px;
-            margin-top: 20px;
+            padding-top: 20px;
         }
 
         /* 音乐播放器小控件 */
         #music {
             position: fixed;
-            right: 50px;
-            top: 50px;
+            left: 30px;
+            top: 30px;
             width: 32px;
             height: 32px;
             background: url(icon-music.png) no-repeat;
@@ -194,6 +194,18 @@
                 }
             }
 
+            // 封装的解除事件绑定函数
+            function removeHandler(element, type, handler) {
+        
+                if (element.removeEventListener) {
+                    element.removeEventListener(type, handler, false);
+                } else if (element.detachEvent) {
+                    element.detachEvent('on' + type, newHandler = handler);
+                } else {
+                    element['on' + type] = null;
+                }
+            }
+
             // 画大心形图案的函数
             function bigHeart() {
                 var c2 = document.getElementById('c2'),
@@ -314,9 +326,9 @@
             }
 
             // 用户单击页面开始播放
-            addEvent(document.body, "click", function() {
+            addEvent(document.body, "click", function clickHandler() {
                         bigHeart();
-                        document.onclick = null;
+                        removeHandler(document.body, "click", clickHandler);
             });
         }())
 
@@ -338,11 +350,24 @@
 
         // 背景第三层文本
         ;(function() {
+            // 封装的事件绑定函数
             function addEvent(obj, event, fn) {
                 if (obj.addEventListener) {//IE9+
                     obj.addEventListener(event, fn, false);
                 } else if (obj.attachEvent) {//IE8，IE8-
                     obj.attachEvent('on' + event, fn);
+                }
+            }
+
+            // 封装的解除事件绑定函数
+            function removeHandler(element, type, handler) {
+        
+                if (element.removeEventListener) {
+                    element.removeEventListener(type, handler, false);
+                } else if (element.detachEvent) {
+                    element.detachEvent('on' + type, newHandler = handler);
+                } else {
+                    element['on' + type] = null;
                 }
             }
             function drow() {
@@ -401,10 +426,10 @@
             }
             
             // 用户单击页面半分钟后开始播放
-            addEvent(document.body, "click", function() {
+            addEvent(document.body, "click", function clickHandler() {
                         setTimeout(drow, 30000);
                         // drow();
-                        document.body.onclick = null;
+                        removeHandler(document.body, "click", clickHandler);
             });
         }())
 
