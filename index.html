@@ -3,702 +3,570 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>Beating Heart</title>
-    <script type="text/javascript">var cnzz_protocol = (("https:" == document.location.protocol) ? " https://" : " http://");document.write(unescape("%3Cspan id='cnzz_stat_icon_1263932230'%3E%3C/span%3E%3Cscript src='" + cnzz_protocol + "s13.cnzz.com/z_stat.php%3Fid%3D1263932230%26show%3Dpic' type='text/javascript'%3E%3C/script%3E"));</script>
+    <title>2d文字粒子化效果--仿AlloyTeam</title>
+    <link rel="stylesheet" href="">
     <style>
-        /* 心形背景层 */
-        #c1, #c2, #c3{
-            position: fixed;
-        }
-
-        #c2, #c3{
+        html, body {
+            position: absolute;
+            width: 100%;
             height: 100%;
-            width:  100%;
-        }
-
-        /* 文本div框 */
-        #txt1, #txt2, #txt3{
-            width: 400px;
-            color: rgb(255, 133, 133);
-            margin-left: 50px;
-            padding-top: 20px;
-        }
-
-        /* 音乐播放器小控件 */
-        #music {
-            position: fixed;
-            left: 10px;
-            top: 10px;
-            width: 32px;
-            height: 32px;
-            background: url(icon-music.png) no-repeat;
-            background-size: 100%;
-            cursor: pointer;
-        }
-        .rotate{
-            -webkit-animation: rotating 1.2s linear infinite;
-            -moz-animation: rotating 1.2s linear infinite;
-            -o-animation: rotating 1.2s linear infinite;
-            animation: rotating 1.2s linear infinite; 
-        }
-        @keyframes rotating{
-            0%{transform: rotate(0deg);}
-            100%{transform: rotate(360deg);}
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
         }
     </style>
 </head>
 <body>
-    <canvas id="c1" ></canvas>
-    <canvas id="c2" ></canvas>
-    <canvas id="c3" ></canvas>
-    <div id="music" class = "rotate">
-        <audio id = "audio" autoplay loop src="周杰伦 - 晴天.mp3">您的浏览器不支持背景音乐！！！</audio>
-    </div>
-    <div id="txt1"> </div>
-    <div id="txt2"> </div>
-    <div id="txt3"> </div>
-    <!-- canvas运动原理，每次都擦除画布然后重新绘制 -->
-    <!-- 多物体运动核心，存储多物体的数据 -->
     <script>
-        // 将站长统计隐藏
+        // 使用“构造函数/原型”混合的方式构造类
         ;(function() {
-            var span = document.getElementsByTagName("span");
-            span[0].setAttribute("style","display:none");
+            "use strict"
+            var TextParticles = function() {
+
+                // 下面是一些需要用到的工具函数
+
+                // 向下兼容requestAnimFrame 
+                window.requesetAnimFrame = function () {
+                    return window.requesetAnimationFrame ||
+                        window.webkitRequestAnimationFrame ||
+                        window.mozRequestAnimationFrame ||
+                        window.oRequestAnimationFrame ||
+                        window.msRequestAnimationFrame ||
+                        function (fn) {
+                            window.setTimeout(fn, 1000/60);
+                        };
+                }();
+
+                /**
+                 * @param  {tarObj}
+                 * @param  {tarObj}
+                 * @param  {Boolean}
+                 * @return {Obj}
+                 * 将source中的属性复制给target
+                 * 如果isOverwrite不传或者传入true
+                 * 则使用source中的属性覆盖target中的同名属性的属性值
+                 */
+                var extend = function(target, source, isOverwrite) {
+                    if (isOverwrite == undefined) {
+                        isOverwrite = true;
+                    }
+
+                    for (var key in source) {
+                        if (!(key in target) || isOverwrite) {
+
+                            // 如果对象的属性值也是对象，则递归调用
+                            if (typeof source[key] == "object") {
+                                extend(target[key], source[key], isOverwrite);
+                            } else {
+                                target[key] = source[key];
+                            }
+                        }
+                    }
+
+                    return target;
+                };
+                // 可以传入id或者dom元素
+                var $ = function(id) {
+                    return document.getElementById(id) || id;
+                };
+                var $$ = function(tag, parent) {
+                    return parent.getElementsByTagName(tag);
+                };
+                var addEvent = function(element, type, handler) {
+                    element.addEventListener ? 
+                    element.addEventListener(type, handler, false) :
+                    element.attachEvent("on" + type, function() {
+                        // 修正handler调用时的this
+                        handler.call(element);
+                    });
+                };
+                var removeEvent = function(element, type, handler) {
+                    element.removeEventListener ?
+                    element.removeEventListener(type, handler, false) :
+                    element.detachEvent("on" + type, handler);
+                };
+                var mouseX = 0, mouseY = 0; 
+
+                // 初始化
+                var init = function(options) {
+                    this.opt = {
+                        textSize: 200,      // 粒子化后，粒子组成的文本大小
+                        particleSize: 0.04, // 粒子的基础大小
+                        textStyle: {        // 源文本样式，一般只需改动fontFamily
+                            textAlign: "center",
+                            textBaseline: "middle",
+                            fontSize: 20,  // 原始文本字体大小，决定了粒子的数量
+                            fontFamily: "sans-serif"
+                        },
+                        text: "文字粒子化",
+                        drawMethod: "fillText"
+
+                    }
+                    // 文字可以通过缩小字体的方式而不是将取到的点的数量减少的方式创建粒子
+                    // 故不再需要place计数器
+                    // 如果是图片则需要使用该计数器
+                    // this.place = 0; // 有符合条件的像素点则加一
+                    // 根据传入的options扩展this.opt
+                    extend(this.opt, options);
+                    // 实际初始化操作
+                    var start ,end;
+                    start = + new Date();
+                    this.initialize();
+                    end = + new Date();
+                    // console.log(end - start);
+                }
+
+                // 定义init的方法
+                init.prototype = {
+                    initialize: function() {    // 实际初始化操作
+                        // 如果初始化时传入了canvas的id，则获取这个canvas元素，
+                        // 否则创建一个canvas元素
+                        if (this.opt.canvasId == null) {
+                            this.getCanvas();
+                        } else {
+                            this.canvas = $(this.opt.canvasId);
+                        }
+
+                        // 存储粒子的数组
+                        this.particles = [];    
+
+                        // 多组文本各自的填充样式
+                        this.textStyles = [];
+
+                        // 获取canvas绘制上下文
+                        this.ctx = this.canvas.getContext("2d");
+
+                        // 设置画布属性（全屏铺满）
+                        this.setCanvasStyle();
+
+                        // // 设置绘制属性
+                        // this.setTextStyle();
+
+                        // // 绘制文本
+                        // this.drowText();
+                        this.fillText();
+
+                        // 获取文本像素数据
+                        this.getImageDate();
+
+                        // 添加交互动画
+                        this.bindEvent();
+
+                        // 循环动画
+                        this.loop();
+                    },
+                    loop: function() {
+                        var _this = this;
+                        requesetAnimFrame(function() {
+                            _this.loop();
+                        });
+                        this.doFrame(); // 绘制动画帧
+                    },
+                    doFrame: function() {
+                        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                        for (var i = 0; i < this.particles.length; i++) {
+                            var p = this.particles[i];
+                            p.update();
+                        }
+                    },
+                    bindEvent: function() {
+                        var _this = this;
+                        addEvent(this.canvas, "mousemove", function(e) {
+                            mouseX = e.clientX;
+                            mouseY = e.clientY;
+                        });
+                        addEvent(window, "resize", function(e) {
+                            _this.setCanvasStyle();
+                        })
+                    },
+                    getImageDate: function() {
+                        // var pixels = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height),
+                        var pixels,         // 存储源文本图像信息
+                            width, height,  // 设备像素确定的宽和高
+                            sourceWidth, sourceHeight,  // 源文本占据的宽和高
+                            data,   // 像素信息
+                            canvas, // 画布
+                            opt,    // 配置信息
+
+                        sourceWidth = this.sourceWidth;
+                        sourceHeight = this.sourceHeight;
+                        canvas = this.canvas;
+                        opt = this.opt;
+
+                        pixels =this.ctx.getImageData(0, 0, sourceWidth, sourceHeight);
+
+                        var size = opt.textSize,
+                            offsetX = canvas.width/2,
+                            offsetY = canvas.height/2,
+                            rate = size/opt.textStyle.fontSize;
+
+                        width = pixels.width;
+                        height = pixels.height;
+
+                        data = pixels.data;
+
+                        for (var row = 0; row < height; row++ ) {
+                            for (var col = 0; col < width; col++) {
+                                // 取得alpha分量
+                                var i = (row * width + col) * 4;
+
+                                // 如果alpha大于64，则添加一个小图形
+                                if (data[i + 3] > 64) {
+                                    // this.place++;
+                                    // 通过缩小字体的方式而不是将取到的点的数量减少的方式创建粒子
+                                    // 保证了字体粒子化之后还能很清晰的显示出文字
+                                    // (this.place % 4 === 0) && this.particles.push();
+                                    this.particles.push(
+                                        new Particle((col - sourceWidth/2) * rate + offsetX, (row -sourceHeight/2) * rate + offsetY, canvas, rate, opt.particleSize)
+                                        );
+                                }
+                            }
+                        }
+                    },
+                    setCanvasStyle: function() {    // 全屏canvas
+                        this.canvas.width = window.innerWidth;
+                        this.canvas.height = window.innerHeight;
+                    },
+                    getCanvas: function() { // 创建canvas元素
+                        var canvas = document.createElement("canvas");
+                        document.body.appendChild(canvas);
+                        this.canvas = canvas;
+                        return canvas;
+                    },
+                    fillText: function() {
+                        var defaultText = "Welcome", 
+                            defaultStyle = {
+                                textAlign: "center",
+                                textBaseline: "middle",
+                                fontSize: 16,
+                                fontFamily: "微软雅黑"
+                            },
+                            defaultDrawMethod = "fillText",     // 默认使用填充的方式
+                            _text = this.opt.text || defaultText,
+                            _textAlign = this.opt.textStyle.textAlign || defaultStyle.textAlign,
+                            _textBaseline = this.opt.textStyle.textBaseline || defaultStyle.textBaseline,
+                            _fontSize = this.opt.textStyle.fontSize || defaultStyle.fontSize,
+                            _fontFamily = this.opt.textStyle.fontFamily || defaultStyle.fontFamily,  // 实际设置的样式
+                            _method = this.opt.drawMethod || defaultDrawMethod,
+                            sourceWidth, sourceHeight;  // 源文本区域的宽和高
+
+                        // 设置文字样式
+
+                        this.ctx.textAlign = _textAlign;
+                        this.ctx.textBaseline = _textBaseline;
+                        this.ctx.font = _fontSize + "px " + _fontFamily;
+
+                        // 计算原区域文字的长和高，并存储这两个数据
+                        sourceWidth = this.ctx.measureText(_text).width;
+                        this.ctx[_method](_text, sourceWidth/2, _fontSize/2);
+
+                        this.sourceWidth = sourceWidth;
+                        this.sourceHeight = _fontSize;
+                    }
+                }
+
+                // 图形类（圆）的属性
+                var Particle = function(x, y, canvas, rate, baseSize) {
+                    this.endX = x;              // 文本粒子化时的坐标
+                    this.endY = y;
+                    this.canvas = canvas;
+                    this.ctx = this.canvas.getContext("2d");
+                    
+                    this.startX = Math.random() * this.canvas.width;    // 文本随机的起始坐标
+                    this.startY = Math.random() * this.canvas.height;
+
+                    this.x = this.startX;   // 粒子由随机位置产生，然后再运动回文字
+                    this.y = this.startY;   
+
+                    this.vx = Math.random() * 10 - 5;   // 粒子运动的速度
+                    this.vy = Math.random() * 10 - 5;
+                    this.rate = rate;       // 文字被放大的倍数，放大倍数越小，则粒子也应该越小，一般不要更改
+                    this.baseSize = baseSize || 0.05,  // 粒子的基准大小，可以单独控制每个粒子的大小
+                    this.data = [],             // 存储画小图形需要的控制点坐标
+                    this.num = 6,               // 设置小图形由多少段贝塞尔曲线组成
+                    this.color = {              // 粒子生成时的颜色
+                        R : 233,
+                        G : 123,
+                        B : 66,
+                        A : 1
+                    }
+                }
+
+                // 图形类的方法
+                Particle.prototype = {
+                    move: function() {
+                        var disX = this.endX - this.x,
+                            disY = this.endY - this.y,
+                            dis = Math.sqrt(Math.pow(disX, 2) + Math.pow(disY, 2)),
+                            force = dis * 0.01,
+                            angle = Math.atan2(disY, disX);
+
+                        var mouseF = 0,
+                            mouseA = 0;
+
+                        if (mouseX > 0 && mouseY > 0) {
+                            var dis = Math.pow((this.x - mouseX), 2) + Math.pow((this.y - mouseY), 2);
+                            mouseF = Math.min(5000/dis, 5000);
+                            mouseA = Math.atan2(this.y - mouseY, this.x - mouseX);
+                        } else {
+                            mouseF = 0;
+                            mouseA = 0;
+                        }
+
+                        this.vx += force * Math.cos(angle) + mouseF * Math.cos(mouseA);
+                        this.vy += force * Math.sin(angle) + mouseA * Math.sin(mouseA);
+
+                        this.vx *= 0.92;
+                        this.vy *= 0.92;
+
+                        this.x += this.vx;
+                        this.y += this.vy;
+                    },
+                    create: function() {    // 如果是圆形或者矩形或者只做二维效果，可以不用这个方法
+                        var t = [], // 存储等分的弧度数组
+                            p = [], // 存储控制点的坐标信息
+                            i;
+
+                        var step = (360/this.num)/3;
+
+                        var r = this.baseSize * this.rate,
+                            x = this.x,
+                            y = this.y;     // 避免在for循环中频繁访问this
+
+                        this.data = [];     // 清除上次计算的数据
+
+                        // 计算得到画每个心形所需要的控制点
+                        for (i = 0; i <= 360; i += step) {
+                            t[i] = i * Math.PI/180;
+                            this.data.push({
+                                x : getX(t[i], r, x),
+                                y : getY(t[i], r, y)
+                            });
+                        }
+
+                        // this.data = p;
+
+                        function getX(t, n, offsetX) {
+                            return 16 * Math.pow(Math.sin(t), 3) * n + offsetX;
+                        }
+                        function getY(t, n, offsetY) {
+                            var y;
+                            y = (13*Math.cos(t) - 5 * Math.cos(t * 2) - 2 * Math.cos(t * 3) - Math.cos(t * 4)) * n - offsetY;
+                            return -y;
+                        }
+                    },
+                    render: function() {    // 渲染每个图形
+                        var ctx = this.ctx,
+                            p = this.data,
+                            color = this.color,
+                            num = this.num,
+                            i, j;
+
+                        ctx.beginPath();
+                        ctx.moveTo(p[0].x, p[0].y);
+                        // 绘制心形路径
+                        for (i = 0, j = 0; i < num; i += 1){
+                            j = i * 3;
+                            ctx.bezierCurveTo(p[j + 1].x, p[j + 1].y, p[j + 2].x, p[j + 2].y, p[j + 3].x, p[j + 3].y);
+                        }
+
+                        ctx.closePath();
+                        ctx.fillStyle = "rgba(" + color.R + "," + color.G + "," + color.B + "," + color.A + ")";
+                        ctx.fill();
+
+                        // this.ctx.beginPath();
+                        // this.ctx.fillStyle = "#111";
+                        // // this.ctx.fillRect(this.x, this.y, 10, 10);
+                        // this.ctx.arc(this.x, this.y, 5, Math.PI * 0, Math.PI * 2);
+                        // this.ctx.closePath();
+                        // this.ctx.fill(); 
+                    },
+                    update: function() {
+                        this.move();        // 改变粒子的x和y坐标
+                        this.create();      // 根据粒子的形状和x、y坐标，创建出新的粒子
+                        this.render();      // 渲染创建出的粒子
+                    }
+                }
+                return init;
+            }();
+            onload = function() {
+                new TextParticles();
+            }
         }())
+
         // 先把画布充满屏幕
-        ;(function() {
+        function aa() {
             var c1 = document.getElementById('c1');
 
             c1.setAttribute("height",window.innerHeight);
             c1.setAttribute("width",window.innerWidth);
-        }())
+        }
 
-        // 背景无规则心形图案
-        ;(function() {
-            function heart() {
-                var c1 = document.getElementById('c1'),
-                    ctx = c1.getContext("2d"),
-                    data = [],  // 存储每个物体的数据
-                    // offsetX = 200,
-                    // offsetY = 200,
-                    // r = 10,
-                    num = 36,  // 图形一共需要分割成曲线的个数
-                    step = (360/num)/3, // 每个相邻取样点相差的角度数
-                    timer1, timer2;
+        // 绘制规则多边形
+        function bb() {
+            var c1 = document.getElementById('c1'),
+                ctx = c1.getContext("2d"),
+                defaultZ = 300;     // 默认投影面的z
 
-                // 物体的运动，延时时间控制单个物体运动的速度
-                timer1 = setInterval(function() {
-                    var i, j;
-                    ctx.clearRect(0, 0, c1.width, c1.height);
+            // 根据该点在三维坐标系下的坐标
+            // 以及投影面的z
+            // 确定该点在投影面上的二维坐标
+            // x1、y1、z1：实际的点
+            // x2、y2、z2：被投影在投影面上的点
+            function getPositionIn2D(parameters) {
+                var pos2d = {},
+                    x1 = parameters.x1,
+                    y1 = parameters.y1,
+                    z1 = parameters.z1,
+                    z2 = parameters.z2 || defaultZ,  // 默认起始的z为300
+                    x2, y2;     // 求出的在视口（屏幕）上的坐标
 
-                    // 所有小图形向canvas的（c1.width * 3/4，c1.height * 1/2）处靠近
-                    for (i = 0; i < data.length; i += 1) {
+                x2 = x1 * z2/z1;
+                y2 = y1 * z2/z1;
 
-                        // 如果可以移动，则改变它们的x和y
-                        if (data[i].move) {
-                            
-                            if (data[i].x > (c1.width * 3/4 + 1)) {
-                                data[i].x -= 1;
-                            } else if (data[i].x < (c1.width * 3/4 - 1)) {
-                                data[i].x += 1;
-                            }
-
-                            if (data[i].y > 201) {
-                                data[i].y -= 1;
-                            } else if (data[i].y < 199) {
-                                data[i].y += 1;
-                            }
-                        }
-
-                        // 图形大小变化
-                        data[i].r -= data[i].beatSpead;
-                        // 根据最大值和最小值确定ata[i].beatSpead的符号和数值
-                        if (data[i].r < data[i].rMin && data[i].beatSpead > 0) {
-                            data[i].beatSpead = -data[i].beatSpead * 2;
-                        } else if (data[i].r >= data[i].rMax && data[i].beatSpead < 0) {
-                            data[i].beatSpead = -data[i].beatSpead * 1/2;
-                        }
-
-                        // 如果图形可以向指定点移动，则根据图形的距离设置一个透明度再增加变化的速率
-                        // 如果图形不可以向指定点移动，则固定透明度变化速率为原速率的0.25
-                        j = (Math.abs(data[i].x - (c1.width * 3/4))/(c1.width * 3/4)) > 0.5 ? (Math.abs(data[i].x - (c1.width * 3/4))/(c1.width * 3/4)) : 0.5;
-                        j = data[i].move ? j : 0.25;
-                        // 透明度的变化
-                        data[i].A += 0.04 * data[i].aRate * j;
-                        // 当图形完全不透明时，更改data[i].aRate，使得透明度开始增加
-                        if (data[i].A > 0.9) {
-                            data[i].aRate = -1;
-                        }
-
-                        // 如果透明度小于0.01，即图形已经不可见了则删除该图形数据
-                        if (data[i].A < 0.01) {
-                            data.splice(i, 1);
-                        }
-                    }
-                        
-                    // 循环存储的数据
-                    for (i = 0; i < data.length; i += 1) {
-                        // 绘制单个物体的运动
-                        drowHeart(data[i]);
-                    }
-                }, 50);
-
-                // 保存多物体的数据，延时时间控制物体数量增加的速度
-                timer2 = setInterval(function() {
-                    var x = Math.random() * c1.width,
-                        y = Math.random() * c1.height,
-                        r = Math.random() * 1 + 3,
-                        // R = Math.floor(Math.random() * 256),
-                        R = 255,
-                        G = Math.floor(Math.random() * 256),
-                        B = Math.floor(Math.random() * 256),
-                        A = Math.random() * 0.6 + 0.2 ,
-                        aRate = 1,  // 通过aRate为1还是-1来控制透明度是减少还是增加
-                        beatSpead = Math.random() * 0.1 +0.1, // 图形大小变化的速度
-                        rMin = r * 3/4,    // 图形大小变化的最小值
-                        rMax = r * 4/4,    // 图形大小变化的最大值
-                        move;   // 图形是否会向指定点移动
-
-                    move = ((Math.random() * 4) > 1) ? true : false;  // 此处定义3/4的图形会移动
-
-                    data.push({
-                        x : x,
-                        y : y,
-                        r : r,
-                        R : R,
-                        G : G,
-                        B : B,
-                        A : A,
-                        aRate : aRate,
-                        beatSpead : beatSpead,
-                        rMin : rMin,
-                        rMax : rMax,
-                        move : move
-                    });
-                }, 150);
-            
-                // offsetX：起点x坐标，offsetY：起点y坐标，n：图形大小
-                function drowHeart(data) {
-                    var t = [], // 存储等分的弧度数组
-                        p = [], // 存储控制点的坐标信息
-                        i, j;
-                    // 计算得到画每个心形所需要的控制点
-                    for (i = 0; i <= 360; i += step) {
-                        t[i] = i * Math.PI/180;
-                        p.push({
-                            x : getX(t[i], data.r, data.x),
-                            y : getY(t[i], data.r, data.y)
-                        });
-                    }
-
-                    p.push(p[0]);   // 终点和起点相同
-
-                    ctx.beginPath();
-                    ctx.moveTo(p[0].x, p[0].y);
-                    // 绘制心形路径
-                    for (i = 0, j = 0; i < num; i += 1){
-                        j = i * 3;
-                        ctx.bezierCurveTo(p[j + 1].x, p[j + 1].y, p[j + 2].x, p[j + 2].y, p[j + 3].x, p[j + 3].y);
-                    }
-
-                    ctx.closePath();
-                    ctx.fillStyle = "rgba(" + data.R + "," + data.G + "," + data.B + "," + data.A + ")";
-                    ctx.fill();
-                }
-
-                function getX(t, n, offsetX) {
-                    return 16 * Math.pow(Math.sin(t), 3) * n + offsetX;
-                }
-                function getY(t, n, offsetY) {
-                    var y;
-                    y = (13*Math.cos(t) - 5 * Math.cos(t * 2) - 2 * Math.cos(t * 3) - Math.cos(t * 4)) * n - offsetY;
-                    return -y;
-                }
-            }
-            heart();
-        }())
-
-        // 再把第二层画布充满屏幕
-        ;(function() {
-            var c2 = document.getElementById('c2'),
-                width, height;
-
-            width = 800;
-            height = window.innerHeight/window.innerWidth * width;
-
-            if (height < 1/2 * width) {
-                height = 1/2 * width;
+                return pos2d = {
+                    x : x2,
+                    y : y2
+                };
             }
 
-            c2.setAttribute("height", height);
-            c2.setAttribute("width", width);
-        }())
+            // 根据该点在投影面上的二维坐标
+            // 以及投影面的z
+            // 并给出该点的z坐标
+            // 确定该点在三维坐标系下的坐标
+            // x1、y1、z1：实际的点
+            // x2、y2、z2：被投影在投影面上的点
+            function getPositionIn3D(parameters) {
+                var pos3d = {},
+                    x2 = parameters.x2,
+                    y2 = parameters.y2,
+                    z2 = parameters.z2 || 300,  // 默认起始的z为300
+                    z1 = parameters.z1 || (Math.random() * 200 + 200),  // 没有给定3维坐标下的z则在200到400之间随机生成
+                    x1, y1;     // 求出的在视口（屏幕）上的坐标
 
-        // 背景第二层心形图案
-        ;(function() {
-            // 封装的事件绑定函数
-            function addEvent(obj, event, fn) {
-                if (obj.addEventListener) {//IE9+
-                    obj.addEventListener(event, fn, false);
-                } else if (obj.attachEvent) {//IE8，IE8-
-                    obj.attachEvent('on' + event, fn);
+                x1 = x2 * z1/z2;
+                y1 = y2 * z1/z2;
+
+                return pos3d = {
+                    x : x1,
+                    y : y1,
+                    z : z1
+                };
+            }
+
+            /**
+             * @param  {object}
+             * @return {object}
+             * x、y、z：为原始坐标
+             * dx、dy、dz：为平移分量
+             * angleX、angleY、angleZ：为旋转角度分量
+             * 角度分量一次只需传入两个，但是为了计算方便可以传入三个分量
+             */
+            function changePosition(parameters) {
+                var pos3d = {},
+                    x = parameters.x || 0,  // 避免报错
+                    y = parameters.y || 0,
+                    z = parameters.z || (parameters.z === 0) ? 0 : defaultZ,
+                    dx = parameters.dx || 0,    // 不传入增量则增量为0
+                    dy = parameters.dy || 0,
+                    dz = parameters.dz || 0,
+                    angleX = parameters.angleX || 0,    // 绕X轴旋转角度
+                    angleY = parameters.angleY || 0,    // 绕Y轴旋转角度
+                    angleZ = parameters.angleZ || 0,    // 绕Z轴旋转角度
+                    a, b, c,            // 计算中间量
+                    x2, y2, z2;         // 计算出运动后的坐标
+
+                // 先做平移运动
+                x2 = a = x + dx;
+                y2 = b = y + dy;
+                z2 = c = z + dz;
+
+                // 再做旋转
+                if (!angleX) {  // 存在绕x轴旋转分量
+                    angleX *= Math.PI/180;  // 转换为弧度
+
+                    x2 = a;
+                    y2 = b * Math.cos(angleX) - c * Math.sin(angleX);
+                    z2 = b * Math.sin(angleX) + c * Math.cos(angleX);
+                    a = x2, b = y2, c = z2;
+                }
+                if (!angleY) {  // 存在绕y轴旋转分量
+                    angleY *= Math.PI/180;  // 转换为弧度
+
+                    x2 = c * Math.sin(angleY) + a * Math.cos(angleY);
+                    y2 = b;
+                    z2 = c * Math.cos(angleY) - a * Math.sin(angleY);
+                    a = x2, b = y2, c = z2;
+                }
+                if (!angleZ) {  // 存在绕z轴旋转分量
+                    angleZ *= Math.PI/180;  // 转换为弧度
+
+                    x2 = a * Math.cos(angleZ) - b * Math.sin(angleZ);
+                    y2 = a * Math.sin(angleZ) + b * Math.cos(angleZ);
+                    z2 = c;
+                    a = x2, b = y2, c = z2;
+                }
+
+                return pos3d = {
+                    x : x2,
+                    y : y2,
+                    z : z2
+                };
+            }
+
+            // 绘制正多边形的函数
+            function polygon(c, n, x, y, r, angle, counterclockwise)  {
+                var delta = 2 * Math.PI/n,  // 两个顶点之间的夹角
+                    i;
+                angle = angle || 0;
+                counterclockwise = counterclockwise || false;
+                // 从第一个顶点开始一条新的子路径，使用三角法计算位置
+                c.moveTo((x + r * Math.sin(angle)), (y - r * Math.cos(angle)));
+                // 循环剩余的每个顶点
+                for(i = 1; i < n; i += 1) {
+                    angle += counterclockwise ? -delta : delta;
+                    c.lineTo((x + r * Math.sin(angle)), (y - r * Math.cos(angle)));
+                }
+                c.closePath();  // 将最后一个顶点和起点连接起来
+            }
+
+            function rainbow(maxWidth) {
+                var colors = ["#f00", "#ff7d00", "#ff0", "#0f0", "#00f", "#0ff", "#f0f"],
+                    width = maxWidth, 
+                    length, step,
+                    i;
+
+                length = colors.length;
+                step = maxWidth/length;
+                for (i = 0; i < length; i += 1) {
+                    ctx.strokeStyle = colors[i];
+                    ctx.lineWidth = width;
+                    ctx.stroke();
+                    width -= step;
                 }
             }
 
-            // 封装的解除事件绑定函数
-            function removeHandler(element, type, handler) {
-        
-                if (element.removeEventListener) {
-                    element.removeEventListener(type, handler, false);
-                } else if (element.detachEvent) {
-                    element.detachEvent('on' + type, newHandler = handler);
-                } else {
-                    element['on' + type] = null;
-                }
-            }
-
-            // 画大心形图案的函数
-            function bigHeart() {
-                var c2 = document.getElementById('c2'),
-                    ctx = c2.getContext("2d"),
-                    data = [],  // 存储每个物体的数据
-                    num = 18,  // 图形一共需要分割成曲线的个数，同时也是每个小心形分割的段数（此处影响不大）
-                    step = (360/num)/3, // 每个相邻取样点相差的角度数
-                    size = 1,      // 每个小心形图形最后的尺寸
-                    timer1, timer2;
-
-                // 物体的运动，延时时间控制单个物体运动的速度
-                timer1 = setInterval(function() {
-                    var i;
-                    ctx.clearRect(0, 0, c2.width, c2.height);
-
-                    for (i = 0; i < data.length; i += 1) {
-
-                        if (data[i].r < size) {
-                            data[i].r += 0.01;
-                        }
-
-                        if (data[i].A < 1) {
-                            data[i].A += 0.01;
-                        }
-                    }
-                        
-                    // 循环存储的数据
-                    for (i = 0; i < data.length; i += 1) {
-                        // 绘制单个物体的运动
-                        drowHeart(data[i]);
-                    }
-                }, 50);
-
-                // 3min后运动应该全部完成，关闭定时器
-                setTimeout(function() {
-                    clearInterval(timer1);
-                }, 180000);
-
-                // 保存多物体的数据，延时时间控制物体数量增加的速度
-                timer2 = setInterval(function() {
-
-                            // 画布尺寸设定为宽800，高根据视窗确定，但是最少高400
-                            // 根据画布尺寸实际调试起点为（600,150），图形放大倍数10
-                            setData(600, 150, 10);
-                            if (setData.i > 360) {
-                                clearInterval(timer2);
-                            }
-                        }, 300);
-
-                function setData(offsetX, offsetY, n) {
-                    var x, y,
-                        r = Math.random() * 0.1 + 0.1,
-                        // R = Math.floor(Math.random() * 256),
-                        R = 255,
-                        G = Math.floor(Math.random() * 256),
-                        B = Math.floor(Math.random() * 256),
-                        A = Math.random() * 0.2 + 0.1 ,
-                        t;
-
-                    setData.i = setData.i || 0;     // setData.i保存每一次调用时的角度值
-
-                    t = setData.i * Math.PI/180;        // 获得弧度值
-
-                    x = getX(t, n, offsetX);
-                    y = getY(t, n, offsetY);
-
-                    data.push({
-                        x : x,
-                        y : y,
-                        r : r,
-                        R : R,
-                        G : G,
-                        B : B,
-                        A : A
-                    });
-
-                    setData.i += step;
-
-                }
-            
-                // offsetX：起点x坐标，offsetY：起点y坐标，n：图形大小
-                function drowHeart(data) {
-                    var t = [], // 存储等分的弧度数组
-                        p = [], // 存储控制点的坐标信息
-                        i, j;
-                    // 计算得到画每个心形所需要的控制点
-                    for (i = 0; i <= 360; i += step) {
-                        t[i] = i * Math.PI/180;
-                        p.push({
-                            x : getX(t[i], data.r, data.x),
-                            y : getY(t[i], data.r, data.y)
-                        });
-                    }
-
-                    p.push(p[0]);   // 终点和起点相同
-
-                    ctx.beginPath();
-                    ctx.moveTo(p[0].x, p[0].y);
-                    // 绘制心形路径
-                    for (i = 0, j = 0; i < num; i += 1){
-                        j = i * 3;
-                        ctx.bezierCurveTo(p[j + 1].x, p[j + 1].y, p[j + 2].x, p[j + 2].y, p[j + 3].x, p[j + 3].y);
-                    }
-
-                    ctx.closePath();
-                    ctx.fillStyle = "rgba(" + data.R + "," + data.G + "," + data.B + "," + data.A + ")";
-                    ctx.fill();
-                }
-
-                function getX(t, n, offsetX) {
-                    return 16 * Math.pow(Math.sin(t), 3) * n + offsetX;
-                }
-                function getY(t, n, offsetY) {
-                    var y;
-                    y = (13*Math.cos(t) - 5 * Math.cos(t * 2) - 2 * Math.cos(t * 3) - Math.cos(t * 4)) * n - offsetY;
-                    return -y;
-                }
-            }
-
-            // 用户单击页面开始播放
-            addEvent(document.body, "click", function clickHandler() {
-                        bigHeart();
-                        removeHandler(document.body, "click", clickHandler);
-            });
-        }())
-
-        // 再把第三层画布充满屏幕
-        ;(function() {
-            var c3 = document.getElementById('c3'),
-                width, height;
-
-            width = 800;
-            height = window.innerHeight/window.innerWidth * width;
-
-            if (height < 1/2 * width) {
-                height = 1/2 * width;
-            }
-
-            c3.setAttribute("height", height);
-            c3.setAttribute("width", width);
-        }())
-
-        // 背景第三层文本
-        ;(function() {
-            // 封装的事件绑定函数
-            function addEvent(obj, event, fn) {
-                if (obj.addEventListener) {// IE9+
-                    obj.addEventListener(event, fn, false);
-                } else if (obj.attachEvent) {// IE8，IE8-
-                    obj.attachEvent('on' + event, fn);
-                }
-            }
-
-            // 封装的解除事件绑定函数
-            function removeHandler(element, type, handler) {
-        
-                if (element.removeEventListener) {
-                    element.removeEventListener(type, handler, false);
-                } else if (element.detachEvent) {
-                    element.detachEvent('on' + type, newHandler = handler);
-                } else {
-                    element['on' + type] = null;
-                }
-            }
-            function drow() {
-                var c3 = document.getElementById('c3'),
-                    ctx = c3.getContext("2d"),
-                    str = "乐   乐";
-
-                function print() {
-                    var i, j, txt;
-
-                    i = print.i || 1;
-                    j = print.j || 0;
-
-                    txt  = str.substr(0,i);
-
-                    if (j < 9) {
-                        if (j % 3 == 1 ) {
-                            drowText("\u2665", ctx, c3);
-                        } else {
-                            drowText("", ctx, c3);
-                        }
-                        j += 1;
-                    } else {
-                        if (i < str.length) {
-                            drowText(txt + "\u2665", ctx, c3);
-                            i += 1;
-                        } else if (i == str.length) {
-                            drowText(txt, ctx, c3);
-                            i += 1;
-                        } else {
-                            i = 0;
-                            j = 1;
-                        }
-                    }
-
-                    setTimeout(print, 500);
-
-                    print.i = i;
-                    print.j = j;
-                }
-            
-                function drowText(str, ctx, c) {
-                    var R = 255,
-                        G = Math.floor(Math.random() * 256),
-                        B = Math.floor(Math.random() * 256),
-                        A = Math.random() * 0.5 + 0.5 ;
-                    ctx.clearRect(0, 0, c.width, c.height);
-                    ctx.font = "italic bold 80px/120px Arial,'Microsoft YaHei',黑体,'宋体',sans-serif";
-                    ctx.lineWidth=5;
-                    ctx.strokeStyle="rgba(" + R + "," + G + "," + B + "," + A + ")";
-                    // 根据画布尺寸，手动调试出文本起点为（470,135）；
-                    ctx.strokeText(str, 470, 135);
-                }
-
-                print();
-            }
-            
-            // 用户单击页面半分钟后开始播放
-            addEvent(document.body, "click", function clickHandler() {
-                        setTimeout(drow, 30000);
-                        removeHandler(document.body, "click", clickHandler);
-            });
-        }())
-
-        // 打字机效果打字
-        ;(function() {
-            function start() {
-                var text1 = "<h1>《晴天》</h1>" + 
-                            "<p>故事的小黄花 从出生那年就飘着</p>" + 
-                            "<p>童年的荡秋千 随记忆一直晃到现在</p>" +
-                            "<p>Re So So Si Do Si La</p>" +
-                            "<p>So La Si Si Si Si La Si La So</p>" +
-                            "<p>吹着前奏 望着天空</p>" +
-                            "<p>我想起花瓣 试着掉落</p>" +
-                            "<p>为你翘课的那一天</p>" +
-                            "<p>花落的那一天</p>" +
-                            "<p>教室的那一间 我怎么看不见</p>" +
-                            "<p>消失的下雨天 我好想再淋一遍</p>" +
-                            "<p>没想到 失去的勇气我还留着</p>" +
-                            "<p>好想再问一遍 你会等待还是离开</p>" +
-                            "<p>刮风这天 我试过握着你手</p>" +
-                            "<p>但偏偏 雨渐渐</p>" +
-                            "<p>大到我看你不见</p>" +
-                            "<p>还要多久 我才能在你身边</p>" +
-                            "<p>等到放晴的那天</p>" +
-                            "<p>也许我会比较好一点</p>" +
-                            "<p>从前从前 有个人爱你很久</p>" +
-                            "<p>但偏偏 风渐渐</p>" +
-                            "<p>把距离吹得好远</p>" +
-                            "<p>好不容易 又能再多爱一天</p>" +
-                            "<p>但故事的最后</p>" +
-                            "<p>你好像还是说了 拜拜</p>" +
-                            "<p>为你翘课的那一天</p>" +
-                            "<p>花落的那一天</p>" +
-                            "<p>教室的那一间 我怎么看不见</p>" +
-                            "<p>消失的下雨天 我好想再淋一遍</p>" +
-                            "<p>没想到 失去的勇气我还留着</p>" +
-                            "<p>好想再问一遍</p>" +
-                            "<p>你会等待还是离开</p>" +
-                            "<p>刮风这天 我试过握着你手</p>" +
-                            "<p>但偏偏 雨渐渐</p>" +
-                            "<p>大到我看你不见</p>" +
-                            "<p>还要多久 我才能在你身边</p>" +
-                            "<p>等到放晴的那天</p>" +
-                            "<p>也许我会比较好一点</p>" +
-                            "<p>从前从前 有个人爱你很久</p>" +
-                            "<p>偏偏 风渐渐</p>" +
-                            "<p>把距离吹得好远</p>" +
-                            "<p>好不容易 又能再多爱一天</p>" +
-                            "<p>但故事的最后</p>" +
-                            "<p>你好像还是说了 拜拜</p>" +
-                            "<p>刮风这天 我试过握着你手</p>" +
-                            "<p>但偏偏 雨渐渐</p>" +
-                            "<p>大到我看你不见</p>" +
-                            "<p>还要多久 我才能够在你身边</p>" +
-                            "<p>等到放晴那天</p>" +
-                            "<p>也许我会比较好一点</p>" +
-                            "<p>从前从前 有个人爱你很久</p>" +
-                            "<p>但偏偏 风渐渐</p>" +
-                            "<p>把距离吹得好远</p>" +
-                            "<p>好不容易 又能再多爱一天</p>" +
-                            "<p>但故事的最后</p>" +
-                            "<p>你好像还是说了 拜拜</p>",
-                    text2 = "<p><br></p>" +
-                            "<p><br></p>" + 
-                            "<p><br></p>" + 
-                            "<p><br></p>" + 
-                            "<p>铃，</p>" + 
-                            "<p>在村里过得还习惯吗？</p>" + 
-                            "<p>没有被别人欺负吧？</p>" +
-                            "<p>之前给你送去的和服，</p>" +
-                            "<p>现在穿在身上了吗？</p>" +
-                            "<p>若你遭遇困境、心情低落或悲伤难过，</p>" +
-                            "<p>无论何时，</p>" +
-                            "<p>只需呼唤我杀生丸，</p>" +
-                            "<p>我会即刻赶到你身边。</p>" +
-                            "<p>即使相隔再遥远，</p>" +
-                            "<p>只要你叫我的名字，</p>" +
-                            "<p>我就马上飞奔过去。</p>" +
-                            "<p>无法呼喊的话，</p>" +
-                            "<p>吹声口哨也罢，</p>" +
-                            "<p>打声呼哨也好。</p>" +
-                            "<p>你我之间没有距离，</p>" +
-                            "<p>彼此的心紧密相连，</p>" +
-                            "<p>信赖的力量能战胜一切恐惧，</p>" +
-                            "<p>那样的感情也将使我们的心更加丰盈充实。</p>" +
-                            "<p>所以，</p>" +
-                            "<p>现在你只管做你自己就好，</p>" +
-                            "<p>以后时间还长，</p>" +
-                            "<p>足够我期待你发现自己的真心，</p>" +
-                            "<p>在此之前，</p>" +
-                            "<p>好好保重……</p>" ,
-                    text3 = "<p><br></p>" +
-                            "<p><br></p>" + 
-                            "<p><br></p>" + 
-                            "<p><br></p>" + 
-                            "<p>如果你感到难过</p>" + 
-                            "<p>我愿意帮你承受</p>" +
-                            "<p>如果我感觉喜悦</p>" +
-                            "<p>希望能与你分享</p>" +
-                            "<p>无论你多么讨厌我</p>" +
-                            "<p>但是请你相信</p>" +
-                            "<p>我会一直在你身后</p>" +
-                            "<p><br></p>" +
-                            "<p>THE END</p>" ;
-                function printWord(text, id, time){ 
-                    var txt = document.getElementById(id),
-                        i, j;
-
-                    i = printWord.i || 1;
-                    j = printWord.j || 0;
-
-                    str  = text.substr(0,i);
-
-                    if (j < 14) {
-                        if (j % 4 == 1 ) {
-                            txt.innerHTML = "<h1>&hearts;</h1>";
-                        } else {
-                            txt.innerHTML = "<h1></h1>";
-                        }
-                        j += 1;
-                    } else {
-                        if (text.substr(i-1,1) !== "<") {
-                            txt.innerHTML = str + "&hearts;";
-                        } else {
-                            // 第一行为标题行，第一个<得加上<h1>标签，避免行高闪烁一次
-                            if ((i - 1) == 0) {
-                                txt.innerHTML = "<h1>&hearts;</h1>";
-                            } else {
-                                    txt.innerHTML = text.substr(0, i - 1) + "&hearts;";
-                            }
-                            i += 1;
-                        }
-
-                        i += 1; 
-                    }
-
-                    if (i <= text.length) {
-                        setTimeout(function(){
-                            printWord(text, id, time);
-                        }, time);
-                    } else {
-                        txt.innerHTML = text;
-                    }
-
-                    printWord.i = i;
-                    printWord.j = j;
-                }
-
-                function scrollWindow(text, id) {
-                    var timer,
-                        txt = document.getElementById(id);
-                    timer = setInterval(function() {
-
-                        window.scrollBy(0, 1);
-
-                        if (txt.innerHTML === text) {
-                            clearInterval(timer);
-                        }
-
-                    }, 10);
-                }
-
-                setTimeout(function(){
-                    printWord(text1, "txt1", 200);
-
-                    // 5秒后开始滚动屏幕
-                    setTimeout(function() {
-                            scrollWindow(text1, "txt1");
-                        }, 5000);
-                }, 0);
-
-                setTimeout(function(){
-                    // 重置i和j
-                    printWord.i = 1;
-                    printWord.j = 0;
-
-                    printWord(text2, "txt2", 300);
-
-                    // 直接开始滚动屏幕
-                    setTimeout(function() {
-                            scrollWindow(text2, "txt2");
-                        }, 0);
-                }, 600000);
-
-                setTimeout(function(){
-                    printWord(text3, "txt3", 500);
-
-                    // 不滚动屏幕
-                }, 900000);
-          
-            }
-            // 23秒后开始打印歌词，根据音乐确定的
-            setTimeout(start, 23000);
-        }())
-
-        // 给音乐标签加上单击功能
-        ;(function() {
-            var music = document.getElementById('music'),
-                audio = document.getElementById('audio');
-
-            // 确保页面打开时音乐在播放
-            if (audio.paused) {
-                audio.play();
-                music.className = "rotate";
-            }
-
-            function bindMusic() {
-                music.onclick = function() {
-                    if (audio.paused) {
-                        audio.play();
-                        music.className = "rotate";
-                    } else {
-                        audio.pause();
-                        music.className = "";
-                    }
-                }
-            }
-            bindMusic();
-        }())
+            ctx.beginPath();
+            polygon(ctx, 3, 70, 80, 50);
+            polygon(ctx, 4, 200, 70, 50, Math.PI/4);
+            polygon(ctx, 5, 330, 65, 50);
+            polygon(ctx, 6, 460, 63, 50, Math.PI/6);
+            polygon(ctx, 7, 590, 63, 50, 0, true);
+            var a = new Date();
+            polygon(ctx, 1000000, 300, 300, 50, 0, true);
+            var b = new Date();
+            console.log(b - a);
+            rainbow(20);
+            // ctx.beginPath();
+            // polygon(ctx, 8, 50, 70, 50);
+            // rainbow(30);
+            // ctx.beginPath();
+            // polygon(ctx, 9, 50, 70, 50);
+            // rainbow(30);
+            // ctx.beginPath();
+            // polygon(ctx, 10, 50, 70, 50);
+            // rainbow(30);
+        }
     </script>
 </body>
 </html>
