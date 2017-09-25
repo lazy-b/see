@@ -39,7 +39,7 @@
             -webkit-animation: rotating 1.2s linear infinite;
             -moz-animation: rotating 1.2s linear infinite;
             -o-animation: rotating 1.2s linear infinite;
-            animation: rotating 1.2s linear infinite; 
+            animation: rotating 1.2s linear infinite;
         }
         @keyframes rotating{
             0%{transform: rotate(0deg);}
@@ -93,7 +93,7 @@
                             data.splice(i,1);
                         }
                     }
-                        
+
                     // 循环存储的数据
                     for (i = 0; i < data.length; i += 1) {
                         // 绘制单个物体的运动
@@ -122,7 +122,7 @@
                         A : A
                     });
                 }, 150);
-            
+
                 // offsetX：起点x坐标，offsetY：起点y坐标，n：图形大小
                 function drowHeart(data) {
                     var t = [], // 存储等分的弧度数组
@@ -193,7 +193,7 @@
 
             // 封装的解除事件绑定函数
             function removeHandler(element, type, handler) {
-        
+
                 if (element.removeEventListener) {
                     element.removeEventListener(type, handler, false);
                 } else if (element.detachEvent) {
@@ -228,7 +228,7 @@
                             data[i].A += 0.01;
                         }
                     }
-                        
+
                     // 循环存储的数据
                     for (i = 0; i < data.length; i += 1) {
                         // 绘制单个物体的运动
@@ -282,7 +282,7 @@
                     setData.i += step;
 
                 }
-            
+
                 // offsetX：起点x坐标，offsetY：起点y坐标，n：图形大小
                 function drowHeart(data) {
                     var t = [], // 存储等分的弧度数组
@@ -358,7 +358,7 @@
 
             // 封装的解除事件绑定函数
             function removeHandler(element, type, handler) {
-        
+
                 if (element.removeEventListener) {
                     element.removeEventListener(type, handler, false);
                 } else if (element.detachEvent) {
@@ -370,7 +370,7 @@
             function drow() {
                 var c3 = document.getElementById('c3'),
                     ctx = c3.getContext("2d"),
-                    str = "乐   乐";
+                    str = "嘿   嘿";
 
                 function print() {
                     var i, j, txt;
@@ -405,7 +405,7 @@
                     print.i = i;
                     print.j = j;
                 }
-            
+
                 function drowText(str, ctx, c) {
                     var R = 255,
                         G = Math.floor(Math.random() * 256),
@@ -421,7 +421,7 @@
 
                 print();
             }
-            
+
             // 用户单击页面半分钟后开始播放
             addEvent(document.body, "click", function clickHandler() {
                         setTimeout(drow, 30000);
@@ -432,8 +432,8 @@
         // 打字机效果打字
         ;(function() {
             function start() {
-                var text1 = "<h1>《晴天》</h1>" + 
-                            "<p>故事的小黄花 从出生那年就飘着</p>" + 
+                var text1 = "<h1>《晴天》</h1>" +
+                            "<p>故事的小黄花 从出生那年就飘着</p>" +
                             "<p>童年的荡秋千 随记忆一直晃到现在</p>" +
                             "<p>Re So So Si Do Si La</p>" +
                             "<p>So La Si Si Si Si La Si La So</p>" +
@@ -489,11 +489,11 @@
                             "<p>但故事的最后</p>" +
                             "<p>你好像还是说了 拜拜</p>",
                     text2 = "<p><br></p>" +
-                            "<p><br></p>" + 
-                            "<p><br></p>" + 
-                            "<p><br></p>" + 
-                            "<p>铃，</p>" + 
-                            "<p>在村里过得还习惯吗？</p>" + 
+                            "<p><br></p>" +
+                            "<p><br></p>" +
+                            "<p><br></p>" +
+                            "<p>铃，</p>" +
+                            "<p>在村里过得还习惯吗？</p>" +
                             "<p>没有被别人欺负吧？</p>" +
                             "<p>之前给你送去的和服，</p>" +
                             "<p>现在穿在身上了吗？</p>" +
@@ -518,10 +518,10 @@
                             "<p>在此之前，</p>" +
                             "<p>好好保重……</p>" ,
                     text3 = "<p><br></p>" +
-                            "<p><br></p>" + 
-                            "<p><br></p>" + 
-                            "<p><br></p>" + 
-                            "<p>如果你感到难过</p>" + 
+                            "<p><br></p>" +
+                            "<p><br></p>" +
+                            "<p><br></p>" +
+                            "<p>如果你感到难过</p>" +
                             "<p>我愿意帮你承受</p>" +
                             "<p>如果我感觉喜悦</p>" +
                             "<p>希望能与你分享</p>" +
@@ -530,7 +530,7 @@
                             "<p>我会一直在你身后</p>" +
                             "<p><br></p>" +
                             "<p>THE END</p>" ;
-                function printWord(text, id, time){ 
+                function printWord(text, id, time){
                     var txt = document.getElementById(id),
                         i, j;
 
@@ -559,7 +559,7 @@
                             i += 1;
                         }
 
-                        i += 1; 
+                        i += 1;
                     }
 
                     if (i <= text.length) {
@@ -615,7 +615,7 @@
 
                     // 不滚动屏幕
                 }, 900000);
-          
+
             }
             // 23秒后开始打印歌词，根据音乐确定的
             setTimeout(start, 23000);
